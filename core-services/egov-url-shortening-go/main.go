@@ -51,13 +51,24 @@ func main() {
 		// Use PostgreSQL
 		urlRepo, err = repository.NewPostgresRepository(&cfg.Database, logger)
 		if err != nil {
-			log.Fatalf("Failed to initialize PostgreSQL repository: %v", err)
+			logger.WithError(err).Warn("Failed to initialize PostgreSQL repository, falling back to memory")
+			urlRepo = repository.NewMemoryRepository(logger)
+		} else {
+			logger.Info("Using PostgreSQL repository")
 		}
-		logger.Info("Using PostgreSQL repository")
 	} else {
-		// Use Redis
-		urlRepo = repository.NewRedisRepository(&cfg.Redis, logger)
-		logger.Info("Using Redis repository")
+		// Try Redis first, fallback to memory if Redis is not available
+		redisRepo := repository.NewRedisRepository(&cfg.Redis, logger)
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		if err := redisRepo.HealthCheck(ctx); err != nil {
+			cancel()
+			logger.WithError(err).Warn("Redis not available, using in-memory repository for testing")
+			urlRepo = repository.NewMemoryRepository(logger)
+		} else {
+			cancel()
+			urlRepo = redisRepo
+			logger.Info("Using Redis repository")
+		}
 	}
 
 	// Initialize service
