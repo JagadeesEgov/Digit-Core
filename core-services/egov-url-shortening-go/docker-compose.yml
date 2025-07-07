@@ -1,0 +1,58 @@
+version: '3.8'
+
+services:
+  app:
+    build: .
+    ports:
+      - "8091:8091"
+    environment:
+      - SERVER_PORT=8091
+      - SERVER_CONTEXT_PATH=/egov-url-shortening
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - DATABASE_HOST=postgres
+      - DATABASE_PORT=5432
+      - DATABASE_NAME=devdb
+      - DATABASE_USERNAME=postgres
+      - DATABASE_PASSWORD=postgres
+      - DATABASE_ENABLED=true
+      - APP_HOST_NAME=http://localhost:8091/
+      - APP_STATE_LEVEL_TENANT_ID=pb
+      - HASHIDS_SALT=randomsalt
+      - HASHIDS_MIN_LENGTH=3
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - url-shortener-network
+
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_DB=devdb
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./migrations:/docker-entrypoint-initdb.d
+    networks:
+      - url-shortener-network
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - url-shortener-network
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  url-shortener-network:
+    driver: bridge
